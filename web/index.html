@@ -50,6 +50,18 @@
         <div class="status">
           <span id="status-text">Loading decoder...</span>
           <span id="status-detail" class="status-detail"></span>
+          <div
+            id="progress"
+            class="progress is-active"
+            role="progressbar"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            aria-valuetext="Loading decoder"
+          >
+            <div class="progress-track">
+              <span id="progress-bar" class="progress-bar"></span>
+            </div>
+          </div>
         </div>
 
         <a id="download-link" class="download hidden" download>

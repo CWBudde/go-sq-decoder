@@ -3,11 +3,15 @@ const fileInput = document.getElementById("file-input");
 const convertButton = document.getElementById("convert-button");
 const statusText = document.getElementById("status-text");
 const statusDetail = document.getElementById("status-detail");
+const progress = document.getElementById("progress");
+const progressBar = document.getElementById("progress-bar");
 const fileName = document.getElementById("file-name");
 const fileSize = document.getElementById("file-size");
 const downloadLink = document.getElementById("download-link");
 const logicToggle = document.getElementById("logic-toggle");
 const floatToggle = document.getElementById("float-toggle");
+
+const MAX_FILE_BYTES = 100 * 1024 * 1024;
 
 let currentFile = null;
 let outputUrl = null;
@@ -30,6 +34,23 @@ const setStatus = (primary, detail = "") => {
   statusDetail.textContent = detail;
 };
 
+const setProgress = (active, label) => {
+  if (!progress) return;
+  if (active) {
+    progress.classList.add("is-active");
+    progress.removeAttribute("hidden");
+    if (label) {
+      progress.setAttribute("aria-valuetext", label);
+    }
+  } else {
+    progress.classList.remove("is-active");
+    progress.setAttribute("hidden", "true");
+  }
+  if (progressBar) {
+    progressBar.setAttribute("aria-hidden", active ? "false" : "true");
+  }
+};
+
 const setFile = (file) => {
   currentFile = file;
   resetOutput();
@@ -42,6 +63,16 @@ const setFile = (file) => {
   }
   fileName.textContent = file.name;
   fileSize.textContent = formatBytes(file.size);
+  if (file.size > MAX_FILE_BYTES) {
+    setStatus(
+      "File too large for web demo",
+      "Use the CLI for files larger than 100 MB."
+    );
+    setProgress(false);
+    convertButton.disabled = true;
+    downloadLink.classList.add("hidden");
+    return;
+  }
   convertButton.disabled = !wasmReady;
   downloadLink.classList.add("hidden");
 };
@@ -80,10 +111,12 @@ const ensureWasm = async () => {
   if (wasmReady) return;
   if (!window.Go) {
     setStatus("Missing wasm_exec.js", "Copy Go's wasm_exec.js into the web folder.");
+    setProgress(false);
     return;
   }
   const go = new window.Go();
   try {
+    setProgress(true, "Loading decoder");
     const response = await fetch("sqdecoder.wasm");
     let result;
     if (WebAssembly.instantiateStreaming) {
@@ -95,9 +128,11 @@ const ensureWasm = async () => {
     go.run(result.instance);
     wasmReady = true;
     setStatus("Decoder ready", "Drop a file or choose one to begin.");
+    setProgress(false);
     convertButton.disabled = !currentFile;
   } catch (error) {
     setStatus("Failed to load decoder", error.message || String(error));
+    setProgress(false);
   }
 };
 
@@ -105,9 +140,18 @@ const decodeFile = async () => {
   if (!currentFile || !wasmReady) {
     return;
   }
+  if (currentFile.size > MAX_FILE_BYTES) {
+    setStatus(
+      "File too large for web demo",
+      "Use the CLI for files larger than 100 MB."
+    );
+    setProgress(false);
+    return;
+  }
   resetOutput();
   convertButton.disabled = true;
   setStatus("Decoding...", "Running SQ2 decoder in WebAssembly.");
+  setProgress(true, "Decoding");
 
   try {
     const arrayBuffer = await currentFile.arrayBuffer();
@@ -133,6 +177,7 @@ const decodeFile = async () => {
   } catch (error) {
     setStatus("Decode failed", error.message || String(error));
   } finally {
+    setProgress(false);
     convertButton.disabled = !currentFile;
   }
 };
