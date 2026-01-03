@@ -35,6 +35,12 @@ cover:
 clean:
     rm -f coverage.txt coverage.html go-sq-tool
 
+# Build and serve the WASM demo
+web-demo:
+    cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/
+    GOOS=js GOARCH=wasm go build -o web/sqdecoder.wasm .
+    python3 -m http.server --directory web 8080
+
 # Run all checks (test, lint, coverage)
 check: test lint cover
 
