@@ -2,6 +2,8 @@
 
 A high-quality SQ (Stereo Quadrophonic) encoder/decoder written in Go, implementing the FFT-based SQ² algorithm for accurate 90° phase shifting and superior channel separation.
 
+**🌐 [Try the live web demo](https://cwbudde.github.io/go-sq-tool/)** — decode SQ audio directly in your browser!
+
 ## Overview
 
 **SQ (Stereo Quadraphonic)** is a matrix encoding system developed by CBS in the 1970s for encoding 4-channel quadrophonic audio into a 2-channel stereo signal. This tool can decode SQ-encoded stereo into four channels and encode four-channel quad audio into SQ-compatible stereo.
@@ -122,17 +124,35 @@ Generates a 4-channel WAV with tones at 100/200/400/800 Hz (LF/RF/LB/RB) plus lo
 go-sq-tool --help
 ```
 
-## WASM Demo
+## Web Demo
 
-A simple browser demo lives in `web/` and runs the decoder entirely client-side.
+An interactive **browser-based demo** is available that runs the SQ decoder entirely client-side using WebAssembly.
+
+### Building and Running
 
 ```bash
-if [ -f "$(go env GOROOT)/misc/wasm/wasm_exec.js" ]; then cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/; else cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/; fi
+# Copy the Go WASM runtime
+if [ -f "$(go env GOROOT)/misc/wasm/wasm_exec.js" ]; then
+  cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/
+else
+  cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" web/
+fi
+
+# Build the WASM binary
 GOOS=js GOARCH=wasm go build -buildvcs=false -o web/sqdecoder.wasm .
+
+# Start a local web server
 python3 -m http.server --directory web 8080
 ```
 
-Open `http://localhost:8080` and drop a stereo WAV to decode to quad.
+Then open `http://localhost:8080` in your browser and drag & drop a stereo WAV file to decode it to 4-channel quadrophonic output.
+
+### Features
+
+- ✅ **No server required**: All processing happens in your browser
+- ✅ **Drag & drop interface**: Simply drop a WAV file to decode
+- ✅ **Instant playback**: Listen to decoded quad channels immediately
+- ✅ **Privacy-first**: Your audio never leaves your computer
 
 ## Examples
 
