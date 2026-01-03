@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/cwbudde/go-sq-decoder/internal/encoder"
+	"github.com/cwbudde/go-sq-tool/internal/encoder"
 )
 
 func TestSQEncoder_Process_FrontOnlyShifted(t *testing.T) {

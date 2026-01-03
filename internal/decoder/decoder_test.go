@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/cwbudde/go-sq-decoder/internal/decoder"
+	"github.com/cwbudde/go-sq-tool/internal/decoder"
 )
 
 func TestSQDecoder_Process_FrontChannelsShifted(t *testing.T) {
@@ -68,6 +68,40 @@ func TestSQDecoder_Process_ZeroInputIsZeroOutput(t *testing.T) {
 		for i := 0; i < n; i++ {
 			if math.Abs(out[ch][i]) > tol {
 				t.Fatalf("out[%d][%d] = %.15f, want 0", ch, i, out[ch][i])
+			}
+		}
+	}
+}
+
+func TestSQDecoder_Process_LogicSteeringFinite(t *testing.T) {
+	t.Parallel()
+
+	const (
+		blockSize = 1024
+		overlap   = 512
+		n         = 6 * overlap
+	)
+
+	lt := make([]float64, n)
+	rt := make([]float64, n)
+	for i := 0; i < n; i++ {
+		lt[i] = 0.5 * math.Sin(2.0*math.Pi*float64(i)/97.0)
+	}
+
+	sqDec := decoder.NewSQDecoderWithParams(blockSize, overlap)
+	sqDec.SetSampleRate(44100)
+	sqDec.EnableLogicSteering(true)
+
+	out, err := sqDec.Process([][]float64{lt, rt})
+	if err != nil {
+		t.Fatalf("Process() error = %v", err)
+	}
+
+	for ch := 0; ch < 4; ch++ {
+		for i := 0; i < n; i++ {
+			val := out[ch][i]
+			if math.IsNaN(val) || math.IsInf(val, 0) {
+				t.Fatalf("out[%d][%d] = %v, want finite", ch, i, val)
 			}
 		}
 	}

@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/cwbudde/go-sq-decoder/pkg/sqmath"
+	"github.com/cwbudde/go-sq-tool/pkg/sqmath"
 )
 
 func TestHilbertTransformer_ProcessBlock_PanicsOnWrongBlockSize(t *testing.T) {

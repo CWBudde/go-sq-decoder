@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/cwbudde/go-sq-decoder/pkg/sqmath"
+	"github.com/cwbudde/go-sq-tool/pkg/sqmath"
 )
 
 const (

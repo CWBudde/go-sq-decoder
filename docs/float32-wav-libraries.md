@@ -21,7 +21,7 @@
 ✅ **Read**: Yes (IEEE float read-only via `AudioFormatIEEEFloat = 3` constant)  
 ❌ **Write**: **No** - only PCM writing is supported
 
-### Current Implementation in go-sq-decoder
+### Current Implementation in go-sq-tool
 
 - Uses `wav.NewWriter(file, numSamples, 4, sampleRate, 16)` → **16-bit PCM**
 - Samples are normalized float64 in `[][]float64` buffers, clamped to [-1, 1], then converted to int16

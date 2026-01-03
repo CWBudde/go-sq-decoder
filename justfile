@@ -1,6 +1,6 @@
 # Build the CLI
 build:
-    go build -v -o go-sq-decoder ./...
+    go build -v -o go-sq-tool ./...
 
 # Run all tests
 test:
@@ -33,7 +33,7 @@ cover:
 
 # Clean build artifacts
 clean:
-    rm -f coverage.txt coverage.html go-sq-decoder
+    rm -f coverage.txt coverage.html go-sq-tool
 
 # Run all checks (test, lint, coverage)
 check: test lint cover

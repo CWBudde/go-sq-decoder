@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"math"
 
-	"github.com/cwbudde/go-sq-decoder/pkg/sqmath"
+	"github.com/cwbudde/go-sq-tool/pkg/sqmath"
 )
 
 const (
@@ -22,6 +22,11 @@ type SQDecoder struct {
 	sqrt2         float64
 	hilbertLeft   *sqmath.HilbertTransformer
 	hilbertRight  *sqmath.HilbertTransformer
+	sampleRate    int
+	logicConfig   LogicSteeringConfig
+	logicEnv      [4]float64
+	attackCoeff   float64
+	releaseCoeff  float64
 	inputBufferL  []float64
 	inputBufferR  []float64
 	outputBuffers [4][]float64
@@ -45,6 +50,8 @@ func NewSQDecoderWithParams(blockSize, overlap int) *SQDecoder {
 		sqrt2:        math.Sqrt(2.0) / 2.0, // ≈ 0.707
 		hilbertLeft:  sqmath.NewHilbertTransformer(blockSize, overlap),
 		hilbertRight: sqmath.NewHilbertTransformer(blockSize, overlap),
+		sampleRate:   44100,
+		logicConfig:  DefaultLogicSteeringConfig(),
 		inputBufferL: make([]float64, blockSize),
 		inputBufferR: make([]float64, blockSize),
 		bufferPos:    0,
@@ -55,7 +62,37 @@ func NewSQDecoderWithParams(blockSize, overlap int) *SQDecoder {
 		decoder.outputBuffers[i] = make([]float64, blockSize)
 	}
 
+	decoder.updateLogicCoefficients()
+
 	return decoder
+}
+
+// SetSampleRate sets the sample rate used for logic steering envelopes.
+func (d *SQDecoder) SetSampleRate(sampleRate int) {
+	if sampleRate <= 0 {
+		return
+	}
+	d.sampleRate = sampleRate
+	d.updateLogicCoefficients()
+}
+
+// EnableLogicSteering toggles CBS-style logic steering.
+func (d *SQDecoder) EnableLogicSteering(enabled bool) {
+	d.logicConfig.Enabled = enabled
+}
+
+// SetLogicSteeringConfig updates logic steering parameters.
+func (d *SQDecoder) SetLogicSteeringConfig(config LogicSteeringConfig) {
+	d.logicConfig = config
+	d.updateLogicCoefficients()
+}
+
+func (d *SQDecoder) updateLogicCoefficients() {
+	if d.sampleRate <= 0 {
+		return
+	}
+	d.attackCoeff = timeToCoeff(d.logicConfig.AttackTime, d.sampleRate)
+	d.releaseCoeff = timeToCoeff(d.logicConfig.ReleaseTime, d.sampleRate)
 }
 
 // Process decodes stereo SQ-encoded audio to 4-channel quadrophonic
@@ -133,10 +170,19 @@ func (d *SQDecoder) Process(input [][]float64) ([][]float64, error) {
 			hlt := phaseShiftedL[phaseIdx]
 			hrt := phaseShiftedR[phaseIdx]
 
-			output[0][outIdx] = lt                       // LF = LT
-			output[1][outIdx] = rt                       // RF = RT
-			output[2][outIdx] = d.sqrt2*hlt - d.sqrt2*rt // LB
-			output[3][outIdx] = d.sqrt2*lt - d.sqrt2*hrt // RB
+			lf := lt
+			rf := rt
+			lb := d.sqrt2*hlt - d.sqrt2*rt
+			rb := d.sqrt2*lt - d.sqrt2*hrt
+
+			if d.logicConfig.Enabled {
+				lf, rf, lb, rb = d.applyLogicSteering(lf, rf, lb, rb)
+			}
+
+			output[0][outIdx] = lf
+			output[1][outIdx] = rf
+			output[2][outIdx] = lb
+			output[3][outIdx] = rb
 		}
 	}
 

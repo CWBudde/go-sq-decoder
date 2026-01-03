@@ -18,8 +18,8 @@ go.work
 vendor/
 
 # Build output
-go-sq-decoder
-/go-sq-decoder
+go-sq-tool
+/go-sq-tool
 
 # IDE
 .idea/

@@ -1,4 +1,4 @@
-module github.com/cwbudde/go-sq-decoder
+module github.com/cwbudde/go-sq-tool
 
 go 1.25.0
 

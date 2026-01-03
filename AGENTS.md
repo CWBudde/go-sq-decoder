@@ -13,7 +13,7 @@
 ## Build, Test, and Development Commands
 
 - `go mod download` to fetch dependencies.
-- `go build -o go-sq-decoder` to build the CLI binary.
+- `go build -o go-sq-tool` to build the CLI binary.
 - `go run ./ --help` to run the CLI without building.
 - `go test ./...` to run all tests (currently minimal/none).
 
@@ -40,4 +40,4 @@
 
 - Requires Go 1.21+ (`go.mod`).
 - The CLI expects a 2-channel input WAV and outputs a 4-channel WAV:
-  `go-sq-decoder input.wav output.wav`.
+  `go-sq-tool input.wav output.wav`.

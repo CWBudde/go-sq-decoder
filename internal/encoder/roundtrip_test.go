@@ -4,8 +4,8 @@ import (
 	"math"
 	"testing"
 
-	"github.com/cwbudde/go-sq-decoder/internal/decoder"
-	"github.com/cwbudde/go-sq-decoder/internal/encoder"
+	"github.com/cwbudde/go-sq-tool/internal/decoder"
+	"github.com/cwbudde/go-sq-tool/internal/encoder"
 )
 
 func TestEncodeDecodeRoundTrip_FrontChannels(t *testing.T) {

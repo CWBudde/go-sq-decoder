@@ -92,8 +92,8 @@ Where `sqrt2 = sqrt(2)/2 ≈ 0.707`.
 
 **Decoded Channels**:
 
-- **LF** (Left Front): Pass-through of LT
-- **RF** (Right Front): Pass-through of RT
+- **LF** (Left Front): Direct LT output (contains rear-channel crosstalk)
+- **RF** (Right Front): Direct RT output (contains rear-channel crosstalk)
 - **LB** (Left Back): `0.707 · H(LT) - 0.707 · RT`
 - **RB** (Right Back): `0.707 · LT - 0.707 · H(RT)`
 
@@ -217,7 +217,7 @@ RB = 0.707·(LT - H(RT))
 
 ### 3.3 Why This Works
 
-The front channels (LF, RF) are passed through unmodified in the encoding, so decoding simply extracts them directly.
+The decoder uses direct LT/RT outputs for the front channels because SQ encoding preserves stereo compatibility. However, LT/RT are still mixtures that include rear-channel content, so LF/RF outputs retain crosstalk without logic steering.
 
 The back channels are encoded with:
 
@@ -230,7 +230,7 @@ This creates a **quadrature relationship** that allows the decoder to separate t
 
 SQ is a **4-2-4 matrix system**, meaning it's mathematically impossible to achieve perfect separation of all four channels from only two encoded channels. The system provides:
 
-- **Excellent separation** for front channels (infinite, since they're not mixed)
+- **Limited separation** for front channels because LT/RT include rear-channel mixes
 - **Good separation** for back channels (~3dB front-to-back, ~40dB left-to-right in ideal conditions)
 - **Compromises** in diagonal separation (LF-RB, RF-LB)
 
@@ -373,7 +373,7 @@ This is a **linear time-varying system** (due to the Hilbert transform), so stan
 
 The SQ matrix was chosen to optimize:
 
-1. **Front channel preservation**: LF and RF are undisturbed, ensuring stereo compatibility
+1. **Front channel bias**: LF/RF remain dominant in LT/RT for stereo compatibility, but rear content is still mixed in
 2. **Back channel encoding**: Encoded with 90° phase relationship to front channels
 3. **Energy distribution**: The √2/2 factor maintains total signal energy
 
@@ -532,7 +532,7 @@ var i : integer;
 begin
  for i:=0 to sampleframes-1 do
   begin
-   // Front channels: pass through
+   // Front channels: direct LT/RT outputs (contain rear-channel crosstalk)
    outputs[0,i]:=inputs[0,i];  // LF = LT
    outputs[1,i]:=inputs[1,i];  // RF = RT
 

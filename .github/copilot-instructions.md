@@ -1,4 +1,4 @@
-# Copilot Instructions (go-sq-decoder)
+# Copilot Instructions (go-sq-tool)
 
 ## Big picture
 

@@ -9,7 +9,7 @@ A high-quality SQ (Stereo Quadrophonic) encoder/decoder written in Go, implement
 ### Features
 
 - ✅ **FFT-based Hilbert Transform**: Accurate 90° phase shift across all frequencies
-- ✅ **High-quality decoding**: Superior channel separation using frequency-domain processing
+- ✅ **High-quality decoding**: Good channel separation using frequency-domain processing
 - ✅ **SQ encoding**: Convert quad audio into SQ-compatible stereo
 - ✅ **Simple CLI interface**: Easy to use command-line tool
 - ✅ **WAV file support**: Standard WAV file I/O for compatibility
@@ -21,12 +21,13 @@ This implementation is based on the **SQ² decoder** algorithm which uses:
 
 1. **FFT-based Hilbert Transform** for precise 90° phase shifting
 2. **SQ Decode Matrix**:
-   - LF (Left Front) = LT (pass through)
-   - RF (Right Front) = RT (pass through)
+   - LF (Left Front) = LT (direct output)
+   - RF (Right Front) = RT (direct output)
    - LB (Left Back) = 0.707 × H(LT) - 0.707 × RT
    - RB (Right Back) = 0.707 × LT - 0.707 × H(RT)
 
 Where `H()` denotes the Hilbert transform (90° phase shift) and 0.707 ≈ √2/2.
+Note: LT/RT are mixes of all four channels in the SQ encoder, so LF/RF here are direct LT/RT outputs and therefore include rear-channel crosstalk. This is a basic matrix decoder without logic steering.
 
 See [`sq-decoder-explained.md`](./sq-decoder-explained.md) for comprehensive technical documentation.
 
@@ -39,10 +40,10 @@ See [`sq-decoder-explained.md`](./sq-decoder-explained.md) for comprehensive tec
 ### Build from source
 
 ```bash
-git clone https://github.com/cwbudde/go-sq-decoder.git
-cd go-sq-decoder
+git clone https://github.com/cwbudde/go-sq-tool.git
+cd go-sq-tool
 go mod download
-go build -o go-sq-decoder
+go build -o go-sq-tool
 ```
 
 ## Usage
@@ -50,7 +51,7 @@ go build -o go-sq-decoder
 ### Basic Usage (Decode)
 
 ```bash
-go-sq-decoder input.wav output.wav
+go-sq-tool input.wav output.wav
 ```
 
 **Input**: 2-channel stereo WAV file (SQ-encoded)
@@ -59,13 +60,13 @@ go-sq-decoder input.wav output.wav
 ### Decode (Explicit)
 
 ```bash
-go-sq-decoder decode input.wav output.wav
+go-sq-tool decode input.wav output.wav
 ```
 
 ### Encode (Quad to SQ Stereo)
 
 ```bash
-go-sq-decoder encode quad_input.wav sq_output.wav
+go-sq-tool encode quad_input.wav sq_output.wav
 ```
 
 **Input**: 4-channel quadrophonic WAV file (LF, RF, LB, RB)
@@ -74,7 +75,7 @@ go-sq-decoder encode quad_input.wav sq_output.wav
 ### Verbose Output
 
 ```bash
-go-sq-decoder -v input.wav output.wav
+go-sq-tool -v input.wav output.wav
 ```
 
 Shows detailed information about processing:
@@ -86,16 +87,39 @@ Shows detailed information about processing:
 ### Custom Parameters
 
 ```bash
-go-sq-decoder -b 2048 -o 1024 input.wav output.wav
+go-sq-tool -b 2048 -o 1024 input.wav output.wav
 ```
 
 - `-b, --block-size`: FFT block size (default: 1024, must be power of 2)
 - `-o, --overlap`: Overlap in samples (default: 512, typically blockSize/2)
+- `--logic`: Enable CBS-style logic steering for improved separation (adds dynamic steering)
+
+### Analyze Channel Separation
+
+```bash
+go-sq-tool analyze quad_input.wav
+```
+
+This runs an encode -> decode loop on isolated channels from a 4-channel input and reports RMS-based separation in dB. Results depend on program material and decoder settings (including `--logic`).
+
+Optional analysis flags:
+
+- `--leak-mode` (`max` or `avg`): how to aggregate leakage across non-target channels
+- `--fmin`, `--fmax`: band-limit the RMS computation (Hz)
+- `--pair-mode` (`isolated` or `full`): compute pair separation using isolated channels or the full mix
+
+### Generate Test File
+
+```bash
+go-sq-tool generate-test test_quad.wav
+```
+
+Generates a 4-channel WAV with tones at 100/200/400/800 Hz (LF/RF/LB/RB) plus low-level white noise for quick separation checks.
 
 ### Help
 
 ```bash
-go-sq-decoder --help
+go-sq-tool --help
 ```
 
 ## Examples
@@ -104,23 +128,23 @@ go-sq-decoder --help
 
 ```bash
 # Basic decode
-go-sq-decoder my_sq_recording.wav quad_output.wav
+go-sq-tool my_sq_recording.wav quad_output.wav
 
 # Verbose mode to see processing details
-go-sq-decoder -v my_sq_recording.wav quad_output.wav
+go-sq-tool -v my_sq_recording.wav quad_output.wav
 
 # Higher quality (larger FFT, more latency)
-go-sq-decoder -b 2048 -o 1024 input.wav output.wav
+go-sq-tool -b 2048 -o 1024 input.wav output.wav
 ```
 
 ### Encode quad to SQ stereo
 
 ```bash
 # Encode 4-channel WAV to SQ stereo
-go-sq-decoder encode quad_input.wav sq_output.wav
+go-sq-tool encode quad_input.wav sq_output.wav
 
 # Float output for headroom
-go-sq-decoder encode --float32 quad_input.wav sq_output.wav
+go-sq-tool encode --float32 quad_input.wav sq_output.wav
 ```
 
 ## Technical Details
@@ -181,7 +205,6 @@ The FFT-based SQ² decoder provides:
 **Advantages**:
 
 - ✅ Accurate 90° phase shift across audio spectrum
-- ✅ Excellent channel separation (30-40 dB estimated)
 - ✅ Predictable frequency response
 - ✅ Superior quality for archival restoration
 
@@ -193,26 +216,35 @@ The FFT-based SQ² decoder provides:
 
 For real-time applications requiring minimal latency, consider implementing the simpler recursive filter variant (not included in this tool).
 
-## Project Structure
+## Separation Measurements
+
+Channel separation is reported by the built-in analyzer, which runs an encode -> decode loop and measures RMS leakage. The numbers are content-dependent, so use the analyzer on your own material (or the generated test file) instead of relying on estimates.
+
+Example workflow:
+
+```bash
+go-sq-tool generate-test ./assets/temp_quad.wav --noise-level 0
+go-sq-tool analyze ./assets/temp_quad.wav --pair-mode full
+```
+
+Example output (basic matrix decode, full mix, no noise):
 
 ```
-go-sq-decoder/
-├── main.go                      # Entry point
-├── cmd/
-│   └── root.go                  # CLI implementation (Cobra)
-├── internal/
-│   ├── encoder/
-│   │   └── encoder.go          # SQ encoder core algorithm
-│   ├── decoder/
-│   │   └── decoder.go          # SQ decoder core algorithm
-│   └── wav/
-│       └── wav.go              # WAV file I/O
-├── pkg/
-│   └── sqmath/
-│       └── hilbert.go          # Hilbert transform (FFT-based)
-├── sq-decoder-explained.md     # Technical documentation
-└── README.md
+Channel  TargetRMS   LeakRMS  Sep(dB)
+LF       0.424032  0.299836    3.01
+RF       0.424019  0.299827    3.01
+LB       0.211999  0.299812   -3.01
+RB       0.212004  0.299819   -3.01
+
+Pair separation (dB)
+LF->RF: -0.00  RF->LF: 0.00  LB->RB: 0.00  RB->LB: -0.00
 ```
+
+Tips:
+
+- Add `--logic` to measure CBS-style logic steering behavior.
+- Use `--leak-mode avg` for average leakage instead of max-leak.
+- Use `--fmin`/`--fmax` for band-limited separation.
 
 ## Contributing
 
@@ -225,7 +257,6 @@ Contributions welcome! Please feel free to submit issues or pull requests.
 - [ ] Real-time processing mode
 - [ ] GUI frontend
 - [ ] Batch processing
-- [ ] Channel separation quality metrics
 
 ## References
 
@@ -243,12 +274,6 @@ See [`sq-decoder-explained.md`](./sq-decoder-explained.md) for detailed technica
 ## License
 
 MIT License - feel free to use for any purpose.
-
-## Acknowledgments
-
-- Based on the SQ² decoder implementation from Delphi/VST plugins
-- Algorithm documentation reverse-engineered from working code
-- Uses FFT library by MeKo-Christian
 
 ---
 
