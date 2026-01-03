@@ -6,12 +6,23 @@ import (
 	algofft "github.com/MeKo-Christian/algo-fft"
 )
 
+type WindowType string
+
+const (
+	WindowHann        WindowType = "hann"
+	WindowHanning     WindowType = "hanning" // alias
+	WindowHamming     WindowType = "hamming"
+	WindowBlackman    WindowType = "blackman"
+	WindowRectangular WindowType = "rect"
+)
+
 // HilbertTransformer performs 90-degree phase shift using FFT
 type HilbertTransformer struct {
 	blockSize   int
 	overlap     int
 	fftSize     int
 	fftPlan     *algofft.Plan[complex128]
+	windowType  WindowType
 	window      []float64
 	transferFn  []complex128
 	inputBuffer []float64
@@ -22,6 +33,12 @@ type HilbertTransformer struct {
 // blockSize: FFT block size (should be power of 2)
 // overlap: overlap in samples (typically blockSize/2)
 func NewHilbertTransformer(blockSize, overlap int) *HilbertTransformer {
+	return NewHilbertTransformerWithWindow(blockSize, overlap, WindowHann)
+}
+
+// NewHilbertTransformerWithWindow creates a new Hilbert transformer with a selectable window.
+// windowType: one of WindowHann/WindowHamming/WindowBlackman/WindowRectangular.
+func NewHilbertTransformerWithWindow(blockSize, overlap int, windowType WindowType) *HilbertTransformer {
 	plan, err := algofft.NewPlan64(blockSize)
 	if err != nil {
 		panic(err)
@@ -32,6 +49,7 @@ func NewHilbertTransformer(blockSize, overlap int) *HilbertTransformer {
 		overlap:     overlap,
 		fftSize:     blockSize,
 		fftPlan:     plan,
+		windowType:  windowType,
 		inputBuffer: make([]float64, blockSize),
 	}
 
@@ -54,8 +72,8 @@ func (ht *HilbertTransformer) makeFilter() {
 		// Even indices remain 0
 	}
 
-	// Apply Hanning window
-	ht.window = hanningWindow(ht.overlap)
+	// Apply window
+	ht.window = makeWindow(ht.windowType, ht.overlap)
 	for i := 0; i < ht.overlap; i++ {
 		impulse[i] *= ht.window[i]
 	}
@@ -79,11 +97,69 @@ func (ht *HilbertTransformer) makeFilter() {
 	ht.initialized = true
 }
 
-// hanningWindow creates a Hanning window
-func hanningWindow(size int) []float64 {
+func makeWindow(windowType WindowType, size int) []float64 {
+	switch windowType {
+	case WindowHann, WindowHanning:
+		return hannWindow(size)
+	case WindowHamming:
+		return hammingWindow(size)
+	case WindowBlackman:
+		return blackmanWindow(size)
+	case WindowRectangular:
+		return rectangularWindow(size)
+	default:
+		panic("unknown window type")
+	}
+}
+
+// hannWindow creates a Hann window (often called "Hanning").
+func hannWindow(size int) []float64 {
 	window := make([]float64, size)
+	if size <= 1 {
+		for i := range window {
+			window[i] = 1
+		}
+		return window
+	}
 	for i := 0; i < size; i++ {
 		window[i] = 0.5 * (1.0 - math.Cos(2.0*math.Pi*float64(i)/float64(size-1)))
+	}
+	return window
+}
+
+func hammingWindow(size int) []float64 {
+	window := make([]float64, size)
+	if size <= 1 {
+		for i := range window {
+			window[i] = 1
+		}
+		return window
+	}
+	for i := 0; i < size; i++ {
+		window[i] = 0.54 - 0.46*math.Cos(2.0*math.Pi*float64(i)/float64(size-1))
+	}
+	return window
+}
+
+func blackmanWindow(size int) []float64 {
+	window := make([]float64, size)
+	if size <= 1 {
+		for i := range window {
+			window[i] = 1
+		}
+		return window
+	}
+	for i := 0; i < size; i++ {
+		x := 2.0 * math.Pi * float64(i) / float64(size-1)
+		window[i] = 0.42 - 0.5*math.Cos(x) + 0.08*math.Cos(2*x)
+	}
+	return window
+}
+
+func rectangularWindow(size int) []float64 {
+	window := make([]float64, size)
+	for i := range window {
+		window[i] = 1
 	}
 	return window
 }
