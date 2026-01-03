@@ -122,6 +122,18 @@ Generates a 4-channel WAV with tones at 100/200/400/800 Hz (LF/RF/LB/RB) plus lo
 go-sq-tool --help
 ```
 
+## WASM Demo
+
+A simple browser demo lives in `web/` and runs the decoder entirely client-side.
+
+```bash
+cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" web/
+GOOS=js GOARCH=wasm go build -o web/sqdecoder.wasm .
+python3 -m http.server --directory web 8080
+```
+
+Open `http://localhost:8080` and drop a stereo WAV to decode to quad.
+
 ## Examples
 
 ### Decode SQ record to quadrophonic

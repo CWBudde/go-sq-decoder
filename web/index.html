@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SQ Quad Decoder WASM Demo</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <p class="eyebrow">SQ Quadrophonic Decoder</p>
+        <h1>Decode SQ stereo into quad audio, right in your browser.</h1>
+        <p class="subhead">
+          Drop a 2-channel WAV, run the decoder in WebAssembly, then download a 4-channel WAV.
+        </p>
+      </header>
+
+      <section class="panel">
+        <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="Drop WAV file">
+          <div class="drop-content">
+            <p class="drop-title">Drop a WAV file here</p>
+            <p class="drop-meta">Stereo input only. No uploads. Everything stays local.</p>
+          </div>
+          <div class="file-info" id="file-info">
+            <span class="file-name" id="file-name">No file selected</span>
+            <span class="file-size" id="file-size"></span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <label class="button ghost">
+            Choose file
+            <input id="file-input" type="file" accept=".wav,audio/wav" />
+          </label>
+          <button id="convert-button" class="button primary" disabled>Decode to quad</button>
+        </div>
+
+        <div class="options">
+          <label class="toggle">
+            <input id="logic-toggle" type="checkbox" />
+            <span>Logic steering</span>
+          </label>
+          <label class="toggle">
+            <input id="float-toggle" type="checkbox" />
+            <span>Float32 output</span>
+          </label>
+        </div>
+
+        <div class="status">
+          <span id="status-text">Loading decoder...</span>
+          <span id="status-detail" class="status-detail"></span>
+        </div>
+
+        <a id="download-link" class="download hidden" download>
+          Download decoded WAV
+        </a>
+      </section>
+
+      <section class="facts">
+        <div class="fact">
+          <h3>Input</h3>
+          <p>SQ-encoded stereo WAV (LT, RT)</p>
+        </div>
+        <div class="fact">
+          <h3>Output</h3>
+          <p>Quad WAV (LF, RF, LB, RB)</p>
+        </div>
+        <div class="fact">
+          <h3>Engine</h3>
+          <p>FFT-based SQ2 decoder running in WASM</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="wasm_exec.js"></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>

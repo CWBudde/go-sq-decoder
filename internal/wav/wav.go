@@ -2,6 +2,7 @@ package wav
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -21,6 +22,20 @@ func ReadWAV(filename string) (*AudioData, error) {
 	return ReadWAVChannels(filename, 2)
 }
 
+// ReadWAVFromReader reads a WAV stream with a specific channel count.
+func ReadWAVFromReader(r io.Reader, channels int) (*AudioData, error) {
+	audioData, err := readWAV(r, channels)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read WAV: %w", err)
+	}
+	return audioData, nil
+}
+
+// ReadWAVBytes reads a WAV payload with a specific channel count.
+func ReadWAVBytes(data []byte, channels int) (*AudioData, error) {
+	return ReadWAVFromReader(bytes.NewReader(data), channels)
+}
+
 // ReadWAVChannels reads a WAV file with a specific channel count
 func ReadWAVChannels(filename string, channels int) (*AudioData, error) {
 	file, err := os.Open(filename)
@@ -29,12 +44,7 @@ func ReadWAVChannels(filename string, channels int) (*AudioData, error) {
 	}
 	defer file.Close()
 
-	audioData, err := readWAV(file, channels)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read WAV: %w", err)
-	}
-
-	return audioData, nil
+	return ReadWAVFromReader(file, channels)
 }
 
 // WriteWAV writes 4-channel audio data to a WAV file
@@ -48,6 +58,26 @@ func WriteStereoWAV(filename string, data *AudioData) error {
 }
 
 func writeWAVPCM16(filename string, data *AudioData, channels int) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create WAV file: %w", err)
+	}
+	defer file.Close()
+
+	return writeWAVPCM16ToWriter(file, data, channels)
+}
+
+// WriteWAVToWriter writes 4-channel audio data to a WAV stream in 16-bit PCM.
+func WriteWAVToWriter(w io.Writer, data *AudioData) error {
+	return writeWAVPCM16ToWriter(w, data, 4)
+}
+
+// WriteStereoWAVToWriter writes 2-channel audio data to a WAV stream in 16-bit PCM.
+func WriteStereoWAVToWriter(w io.Writer, data *AudioData) error {
+	return writeWAVPCM16ToWriter(w, data, 2)
+}
+
+func writeWAVPCM16ToWriter(w io.Writer, data *AudioData, channels int) error {
 	if len(data.Samples) != channels {
 		return fmt.Errorf("output must have %d channels, got %d", channels, len(data.Samples))
 	}
@@ -60,11 +90,7 @@ func writeWAVPCM16(filename string, data *AudioData, channels int) error {
 		}
 	}
 
-	file, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create WAV file: %w", err)
-	}
-	defer file.Close()
+	bw := bufio.NewWriter(w)
 
 	numChannels := uint16(channels)
 	bitsPerSample := uint16(16)
@@ -74,61 +100,60 @@ func writeWAVPCM16(filename string, data *AudioData, channels int) error {
 	dataSize := uint32(data.NumSamples) * uint32(blockAlign)
 
 	// RIFF header
-	if err := writeString(file, "RIFF"); err != nil {
+	if err := writeString(bw, "RIFF"); err != nil {
 		return fmt.Errorf("failed to write RIFF header: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, uint32(36+dataSize)); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, uint32(36+dataSize)); err != nil {
 		return fmt.Errorf("failed to write file size: %w", err)
 	}
-	if err := writeString(file, "WAVE"); err != nil {
+	if err := writeString(bw, "WAVE"); err != nil {
 		return fmt.Errorf("failed to write WAVE header: %w", err)
 	}
 
 	// fmt chunk
-	if err := writeString(file, "fmt "); err != nil {
+	if err := writeString(bw, "fmt "); err != nil {
 		return fmt.Errorf("failed to write fmt chunk ID: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, uint32(16)); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, uint32(16)); err != nil {
 		return fmt.Errorf("failed to write fmt chunk size: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, audioFormat); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, audioFormat); err != nil {
 		return fmt.Errorf("failed to write audio format: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, numChannels); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, numChannels); err != nil {
 		return fmt.Errorf("failed to write num channels: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, data.SampleRate); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, data.SampleRate); err != nil {
 		return fmt.Errorf("failed to write sample rate: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, byteRate); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, byteRate); err != nil {
 		return fmt.Errorf("failed to write byte rate: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, blockAlign); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, blockAlign); err != nil {
 		return fmt.Errorf("failed to write block align: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, bitsPerSample); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, bitsPerSample); err != nil {
 		return fmt.Errorf("failed to write bits per sample: %w", err)
 	}
 
 	// data chunk
-	if err := writeString(file, "data"); err != nil {
+	if err := writeString(bw, "data"); err != nil {
 		return fmt.Errorf("failed to write data chunk ID: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, dataSize); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, dataSize); err != nil {
 		return fmt.Errorf("failed to write data size: %w", err)
 	}
 
 	// Interleaved PCM16 samples
-	buf := bufio.NewWriter(file)
 	for i := 0; i < data.NumSamples; i++ {
 		for ch := 0; ch < channels; ch++ {
 			sample := floatToPCM16(data.Samples[ch][i])
-			if err := binary.Write(buf, binary.LittleEndian, sample); err != nil {
+			if err := binary.Write(bw, binary.LittleEndian, sample); err != nil {
 				return fmt.Errorf("failed to write sample data: %w", err)
 			}
 		}
 	}
-	if err := buf.Flush(); err != nil {
+	if err := bw.Flush(); err != nil {
 		return fmt.Errorf("failed to flush WAV data: %w", err)
 	}
 
@@ -146,6 +171,26 @@ func WriteStereoFloat32WAV(filename string, data *AudioData) error {
 }
 
 func writeWAVFloat32(filename string, data *AudioData, channels int) error {
+	file, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create WAV file: %w", err)
+	}
+	defer file.Close()
+
+	return writeWAVFloat32ToWriter(file, data, channels)
+}
+
+// WriteFloat32WAVToWriter writes 4-channel audio data to a WAV stream in 32-bit IEEE float format.
+func WriteFloat32WAVToWriter(w io.Writer, data *AudioData) error {
+	return writeWAVFloat32ToWriter(w, data, 4)
+}
+
+// WriteStereoFloat32WAVToWriter writes 2-channel audio data to a WAV stream in 32-bit IEEE float format.
+func WriteStereoFloat32WAVToWriter(w io.Writer, data *AudioData) error {
+	return writeWAVFloat32ToWriter(w, data, 2)
+}
+
+func writeWAVFloat32ToWriter(w io.Writer, data *AudioData, channels int) error {
 	if len(data.Samples) != channels {
 		return fmt.Errorf("output must have %d channels, got %d", channels, len(data.Samples))
 	}
@@ -158,11 +203,7 @@ func writeWAVFloat32(filename string, data *AudioData, channels int) error {
 		}
 	}
 
-	file, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create WAV file: %w", err)
-	}
-	defer file.Close()
+	bw := bufio.NewWriter(w)
 
 	numChannels := uint16(channels)
 	bitsPerSample := uint16(32)
@@ -172,48 +213,48 @@ func writeWAVFloat32(filename string, data *AudioData, channels int) error {
 	dataSize := uint32(data.NumSamples) * uint32(numChannels) * uint32(bitsPerSample/8)
 
 	// Write RIFF header
-	if err := writeString(file, "RIFF"); err != nil {
+	if err := writeString(bw, "RIFF"); err != nil {
 		return fmt.Errorf("failed to write RIFF header: %w", err)
 	}
 	// File size - 8 (will be updated at the end if needed)
-	if err := binary.Write(file, binary.LittleEndian, uint32(36+dataSize)); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, uint32(36+dataSize)); err != nil {
 		return fmt.Errorf("failed to write file size: %w", err)
 	}
-	if err := writeString(file, "WAVE"); err != nil {
+	if err := writeString(bw, "WAVE"); err != nil {
 		return fmt.Errorf("failed to write WAVE header: %w", err)
 	}
 
 	// Write fmt chunk
-	if err := writeString(file, "fmt "); err != nil {
+	if err := writeString(bw, "fmt "); err != nil {
 		return fmt.Errorf("failed to write fmt chunk ID: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, uint32(16)); err != nil { // fmt chunk size
+	if err := binary.Write(bw, binary.LittleEndian, uint32(16)); err != nil { // fmt chunk size
 		return fmt.Errorf("failed to write fmt chunk size: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, audioFormat); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, audioFormat); err != nil {
 		return fmt.Errorf("failed to write audio format: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, numChannels); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, numChannels); err != nil {
 		return fmt.Errorf("failed to write num channels: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, data.SampleRate); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, data.SampleRate); err != nil {
 		return fmt.Errorf("failed to write sample rate: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, byteRate); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, byteRate); err != nil {
 		return fmt.Errorf("failed to write byte rate: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, blockAlign); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, blockAlign); err != nil {
 		return fmt.Errorf("failed to write block align: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, bitsPerSample); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, bitsPerSample); err != nil {
 		return fmt.Errorf("failed to write bits per sample: %w", err)
 	}
 
 	// Write data chunk
-	if err := writeString(file, "data"); err != nil {
+	if err := writeString(bw, "data"); err != nil {
 		return fmt.Errorf("failed to write data chunk ID: %w", err)
 	}
-	if err := binary.Write(file, binary.LittleEndian, dataSize); err != nil {
+	if err := binary.Write(bw, binary.LittleEndian, dataSize); err != nil {
 		return fmt.Errorf("failed to write data size: %w", err)
 	}
 
@@ -230,10 +271,14 @@ func writeWAVFloat32(filename string, data *AudioData, channels int) error {
 				val = 0.0
 			}
 
-			if err := binary.Write(file, binary.LittleEndian, float32(val)); err != nil {
+			if err := binary.Write(bw, binary.LittleEndian, float32(val)); err != nil {
 				return fmt.Errorf("failed to write sample data: %w", err)
 			}
 		}
+	}
+
+	if err := bw.Flush(); err != nil {
+		return fmt.Errorf("failed to flush WAV data: %w", err)
 	}
 
 	return nil
